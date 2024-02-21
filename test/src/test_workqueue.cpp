@@ -70,7 +70,7 @@ TEST(test_workqueue, wq_tickthred)
     tester.Start();
     usleep(100000);
     tester.Stop();
-    TimerFrame  timer = tester.TickTimeFrame();
+    TimeFrame  timer = tester.TickTimeFrame();
 
     EXPECT_GE(tester.TickCount(), 8);
     EXPECT_LE(tester.TickCount(), 12);
