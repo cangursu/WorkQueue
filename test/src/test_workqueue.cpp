@@ -12,7 +12,7 @@
 
 TEST(test_workqueue, wq_basicpush)
 {
-    class WQTester : public WorkQueue<uint8_t, Thread>
+    class WQTester : public WorkQueue<uint64_t, Thread>
     {
         public:
             void Begin()
@@ -25,34 +25,35 @@ TEST(test_workqueue, wq_basicpush)
                 _tidEnd = gettid();
             }
 
-            int Pop(uint8_t *pData)
+            int Pop(uint64_t *pData)
             {
                 _tidPop = gettid();
 
                 EXPECT_TRUE(pData);
                 if (pData) _data |= *pData;
+
                 return 0;
             }
 
-            uint8_t _data = 0;
-            pid_t   _tidBegin = 0;
-            pid_t   _tidPop   = 0;
-            pid_t   _tidEnd   = 0;
+            uint64_t    _data     = 0;
+            pid_t       _tidBegin = 0;
+            pid_t       _tidPop   = 0;
+            pid_t       _tidEnd   = 0;
     };
 
     WQTester que;
     que.Init(WQ_QUEUE_STATE::WORKING);
 
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 64; ++i)
     {
         que.PushBack(0x1 << i);
     }
 
     //Waiting for completion mannually
-    for (int countTry = 0; (que._data != 0xF) && (countTry < 10); ++countTry)
+    for (int countTry = 0; (que._data != 0xffffffffffffffff) && (countTry < 10); ++countTry)
         usleep (50);
 
-    EXPECT_EQ(que._data, 0xF);
+    EXPECT_EQ(que._data, 0xffffffffffffffff);
 
     EXPECT_NE(que._tidBegin, 0);
     EXPECT_NE(que._tidPop,   0);
@@ -68,13 +69,51 @@ TEST(test_workqueue, wq_basicpush)
 }
 
 
+class WQTesterSlow : public WorkQueue<uint8_t, Thread>
+{
+    public:
+        int Pop(uint8_t *pData)
+        {
+            ++_count;
+            usleep(1000);
+            return 0;
+        }
+        int     _count    = 0;
+};
+
+TEST(test_workqueue, wq_exitwait)
+{
+    WQTesterSlow que;
+    que.Init(WQ_QUEUE_STATE::WORKING);
+    constexpr int max = 1000;
+    for (int i = 0; i < max; ++i)
+        que.PushBack(i);
+    que.Release();
+
+    EXPECT_EQ(que._count, max);
+}
+
+TEST(test_workqueue, wq_exitforce)
+{
+    WQTesterSlow que;
+    que.Init(WQ_QUEUE_STATE::WORKING);
+    constexpr int max = 100000;
+    for (int i = 0; i < max; ++i)
+        que.PushBack(i);
+    //que.SetState(WQ_QUEUE_STATE::EXITING_FORCE);
+    que.Release(true);
+
+    EXPECT_NE(que._count, max);
+}
+
 
 TEST(test_workqueue, wq_statetext)
 {
-    EXPECT_EQ(WQ_QUEUE_STATE_text(WQ_QUEUE_STATE::NA     ), std::string("NA")       );
-    EXPECT_EQ(WQ_QUEUE_STATE_text(WQ_QUEUE_STATE::WORKING), std::string("WORKING")  );
-    EXPECT_EQ(WQ_QUEUE_STATE_text(WQ_QUEUE_STATE::EXITING), std::string("EXITING")  );
-    EXPECT_EQ(WQ_QUEUE_STATE_text(WQ_QUEUE_STATE::PAUSE  ), std::string("PAUSE")    );
+    EXPECT_EQ(WQ_QUEUE_STATE_text(WQ_QUEUE_STATE::NA),              std::string("NA")               );
+    EXPECT_EQ(WQ_QUEUE_STATE_text(WQ_QUEUE_STATE::WORKING),         std::string("WORKING")          );
+    EXPECT_EQ(WQ_QUEUE_STATE_text(WQ_QUEUE_STATE::PAUSE),           std::string("PAUSE")            );
+    EXPECT_EQ(WQ_QUEUE_STATE_text(WQ_QUEUE_STATE::EXITING_WAIT),    std::string("EXITING_WAIT")     );
+    EXPECT_EQ(WQ_QUEUE_STATE_text(WQ_QUEUE_STATE::EXITING_FORCE),   std::string("EXITING_FORCE")    );
 }
 
 

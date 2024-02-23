@@ -84,10 +84,11 @@ class TickThread : public Thread
 
 enum class WQ_QUEUE_STATE
 {
-    NA      = 0,
-    WORKING = 1,
-    EXITING = 2,
-    PAUSE   = 3,
+    NA              = 0,
+    WORKING         = 1,
+    PAUSE           = 2,
+    EXITING_WAIT    = 3,
+    EXITING_FORCE   = 4,
 };
 
 std::string WQ_QUEUE_STATE_text(WQ_QUEUE_STATE value);
@@ -136,7 +137,7 @@ class WorkQueue : public TThread
     virtual size_t              PushFront(TData &&data);
 
     virtual void*               Listener();
-    void                        Release();
+    void                        Release(bool bForce = false);
 
     const std::string&          Name() const;
 
@@ -146,7 +147,7 @@ class WorkQueue : public TThread
     mutable std::shared_mutex   _thStatLock;
     std::mutex                  _thLockQue;
     std::condition_variable     _thCond;
-    WQ_QUEUE_STATE              _thState = WQ_QUEUE_STATE::EXITING;
+    WQ_QUEUE_STATE              _thState = WQ_QUEUE_STATE::EXITING_WAIT;
     timespec                    _thWaitTime {1,0};
 
     std::deque<TData>           _container;
@@ -197,9 +198,9 @@ int WorkQueue<TData, TThread>::Init(WQ_QUEUE_STATE state, const std::string &nam
 
 
 template <typename TData, typename TThread>
-void WorkQueue<TData, TThread>::Release()
+void WorkQueue<TData, TThread>::Release(bool bForce /*= false*/)
 {
-    SetState(WQ_QUEUE_STATE::EXITING);
+    SetState(bForce ? WQ_QUEUE_STATE::EXITING_FORCE : WQ_QUEUE_STATE::EXITING_WAIT);
     TThread::Join();
 }
 
@@ -255,13 +256,20 @@ const std::string& WorkQueue<TData, TThread>::Name() const
 template <typename TData, typename TThread>
 size_t WorkQueue<TData, TThread>::PushBack(TData &&data)
 {
-    if (WQ_QUEUE_STATE::EXITING == GetState())
-        return _containerSize;
+    switch (GetState())
+    {
+        case WQ_QUEUE_STATE::EXITING_WAIT  :
+        case WQ_QUEUE_STATE::EXITING_FORCE :
+        case WQ_QUEUE_STATE::PAUSE         :
+            break;
 
-    std::lock_guard<std::mutex> lck{_thLockQue};
-    _container.emplace_front(std::move(data));
-    ++_containerSize;
-    _thCond.notify_one();
+        default :
+            std::lock_guard<std::mutex> lck{_thLockQue};
+            _container.emplace_front(std::move(data));
+            ++_containerSize;
+            _thCond.notify_one();
+            break;
+    }
 
     return _containerSize;
 }
@@ -270,13 +278,19 @@ size_t WorkQueue<TData, TThread>::PushBack(TData &&data)
 template <typename TData, typename TThread>
 size_t WorkQueue<TData, TThread>::PushFront(TData &&data)
 {
-    if (WQ_QUEUE_STATE::EXITING == GetState())
-        return _containerSize;
+    switch (GetState())
+    {
+        case WQ_QUEUE_STATE::EXITING_WAIT  :
+        case WQ_QUEUE_STATE::EXITING_FORCE :
+        case WQ_QUEUE_STATE::PAUSE         :
+            break;
 
-    std::lock_guard<std::mutex> lck{_thLockQue};
-    _container.emplace_back(std::move(data));
-    ++_containerSize;
-    _thCond.notify_one();
+        default :
+            std::lock_guard<std::mutex> lck{_thLockQue};
+            _container.emplace_back(std::move(data));
+            ++_containerSize;
+            _thCond.notify_one();
+    }
 
     return _containerSize;
 }
@@ -301,32 +315,47 @@ void* WorkQueue<TData, TThread>::Listener()
         switch(GetState())
         {
             case WQ_QUEUE_STATE::WORKING:
+            case WQ_QUEUE_STATE::EXITING_WAIT:
             {
                 std::list<TData> listBuff;
 
                 {
                     std::unique_lock<std::mutex> lck{_thLockQue};
-                    _thCond.wait(lck, [this]()   {  return (GetState() == WQ_QUEUE_STATE::EXITING) || (_containerSize > 0); });
+                    _thCond.wait(lck, [this]()   {  return (GetState() == WQ_QUEUE_STATE::EXITING_FORCE) ||
+                                                           (GetState() == WQ_QUEUE_STATE::EXITING_WAIT) ||
+                                                           (_containerSize > 0); });
+                    //std::cout << "_containerSize : " << _containerSize << std::endl;
 
-                    if (GetState() == WQ_QUEUE_STATE::EXITING)
+                    switch (GetState())
                     {
-                        doExit = true;
-                    }
-                    else
-                    {
-                        while (_containerSize > 0)
-                        {
-                            listBuff.push_back(std::move(_container.back()));
-                            //Pop(&_container.back());
+                        case WQ_QUEUE_STATE::EXITING_FORCE :
+                            doExit = true;
+                            break;
 
-                            _container.pop_back();
-                            _containerSize--;
-                        }
+                        case WQ_QUEUE_STATE::EXITING_WAIT :
+                            if (0 == _containerSize)
+                            {
+                                doExit = true;
+                                break;
+                            }
+
+                        default:
+                            while (_containerSize > 0)
+                            {
+                                listBuff.push_back(std::move(_container.back()));
+                                //Pop(&_container.back());
+
+                                _container.pop_back();
+                                _containerSize--;
+                            }
                     }
                 }
 
                 for(auto &item : listBuff)
-                    Pop(&item);
+                {
+                    if (GetState() != WQ_QUEUE_STATE::EXITING_FORCE)
+                        Pop(&item);
+                }
 
                 break;
             }
@@ -335,9 +364,14 @@ void* WorkQueue<TData, TThread>::Listener()
                 clock_nanosleep(CLOCK_MONOTONIC, 0, &GetWaitTime(), NULL);
                 break;
 
-            case WQ_QUEUE_STATE::EXITING:
+            case WQ_QUEUE_STATE::EXITING_FORCE:
                 doExit = true;
                 break;
+
+//            case WQ_QUEUE_STATE::EXITING_WAIT:
+//                if (0 == _containerSize)
+//                    doExit = true;
+//                break;
 
             default :
                 break;

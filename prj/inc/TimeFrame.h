@@ -40,6 +40,8 @@ class TimeFrame
             return ss.str();
         }
 
+        static std::string  TimeStampText(const timespec &ts);
+
         static timespec TimeSpecDiff(const timespec &ts1, const timespec &ts2)
         {
             timespec ts { ts1.tv_sec  - ts2.tv_sec,
