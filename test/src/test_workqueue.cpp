@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <atomic>
+#include <unistd.h>
 
 
 
@@ -14,14 +15,29 @@ TEST(test_workqueue, wq_basicpush)
     class WQTester : public WorkQueue<uint8_t, Thread>
     {
         public:
+            void Begin()
+            {
+                _tidBegin = gettid();
+            }
+
+            void End()
+            {
+                _tidEnd = gettid();
+            }
+
             int Pop(uint8_t *pData)
             {
+                _tidPop = gettid();
+
                 EXPECT_TRUE(pData);
                 if (pData) _data |= *pData;
                 return 0;
             }
 
             uint8_t _data = 0;
+            pid_t   _tidBegin = 0;
+            pid_t   _tidPop   = 0;
+            pid_t   _tidEnd   = 0;
     };
 
     WQTester que;
@@ -38,7 +54,17 @@ TEST(test_workqueue, wq_basicpush)
 
     EXPECT_EQ(que._data, 0xF);
 
+    EXPECT_NE(que._tidBegin, 0);
+    EXPECT_NE(que._tidPop,   0);
+    EXPECT_EQ(que._tidBegin, que._tidPop);
+
+    EXPECT_EQ(que._tidEnd,   0);
+
     que.Release();
+
+    EXPECT_NE(que._tidEnd,   0);
+    EXPECT_EQ(que._tidPop,   que._tidEnd);
+    EXPECT_EQ(que._tidEnd,   que._tidBegin);
 }
 
 
@@ -101,6 +127,15 @@ TEST(test_wqpool, wqp_basicpush)
                 : WorkQueuePool<uint64_t, Thread>(queCount)
             {
             }
+
+            void Begin()
+            {
+            }
+
+            void End()
+            {
+            }
+
             int Pop(uint64_t *pData)
             {
                 //std::cout << "Pop : " << std::hex <<  (int) (*pData) << "\n";

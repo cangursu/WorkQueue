@@ -21,6 +21,7 @@
 
 
 
+
 /**
  * @brief
  * Thread base for Threading/Queueing interfaces.
@@ -128,7 +129,9 @@ class WorkQueue : public TThread
     virtual void                Run() override;
 
 
+    virtual void                Begin();
     virtual int                 Pop(TData *data);
+    virtual void                End();
     virtual size_t              PushBack (TData &&data);
     virtual size_t              PushFront(TData &&data);
 
@@ -162,6 +165,24 @@ template <typename TData, typename TThread>
 int WorkQueue<TData, TThread>::Pop(TData*)
 {
     return 0;
+}
+
+
+template <typename TData, typename TThread>
+void WorkQueue<TData, TThread>::Begin()
+{
+//    std::cout << "Listen thread will be begun\n";
+//    std::cout << "Please overload the virtual member function below\n";
+//    std::cout << "WorkQueue::Begin\n";
+}
+
+
+template <typename TData, typename TThread>
+void WorkQueue<TData, TThread>::End()
+{
+//    std::cout << "Listen thread will be stop\n";
+//    std::cout << "Please overload the virtual member function below\n";
+//    std::cout << "WorkQueue::End\n";
 }
 
 
@@ -264,7 +285,9 @@ template <typename TData, typename TThread>
 void WorkQueue<TData, TThread>::Run()
 {
 //    std::cout << "WorkQueue thread : " << _name << " : Entering\n";
+    Begin();
     Listener();
+    End();
 //    std::cout << "WorkQueue thread : " << _name << " : Quiting \n";
 }
 
@@ -279,7 +302,7 @@ void* WorkQueue<TData, TThread>::Listener()
         {
             case WQ_QUEUE_STATE::WORKING:
             {
-                //std::list<TData> listBuff;
+                std::list<TData> listBuff;
 
                 {
                     std::unique_lock<std::mutex> lck{_thLockQue};
@@ -293,16 +316,17 @@ void* WorkQueue<TData, TThread>::Listener()
                     {
                         while (_containerSize > 0)
                         {
-                            //listBuff.push_back(std::move(_container.back()));
-                            Pop(&_container.back());
+                            listBuff.push_back(std::move(_container.back()));
+                            //Pop(&_container.back());
+
                             _container.pop_back();
                             _containerSize--;
                         }
                     }
                 }
 
-                //for(auto &item : listBuff)
-                //    Pop(&item);
+                for(auto &item : listBuff)
+                    Pop(&item);
 
                 break;
             }
@@ -348,6 +372,16 @@ class WorkQueuePool
             {
                 _pPool = pool;
             }
+            virtual void Begin() override
+            {
+                if (nullptr == _pPool)
+                {
+                    std::cerr << "ERROR: invalid _pPool" << std::endl;
+                    return;
+                }
+
+                return _pPool->Begin();
+            }
             virtual int Pop(TData *data) override
             {
                 if (nullptr == _pPool)
@@ -357,6 +391,16 @@ class WorkQueuePool
                 }
 
                 return _pPool->Pop(data);
+            }
+            virtual void End() override
+            {
+                if (nullptr == _pPool)
+                {
+                    std::cerr << "ERROR: invalid _pPool" << std::endl;
+                    return;
+                }
+
+                return _pPool->End();
             }
         private:
             WorkQueuePool *_pPool = nullptr;
@@ -376,6 +420,8 @@ class WorkQueuePool
         void            Release();
 
         virtual int     Pop(TData *data);
+        virtual void    Begin();
+        virtual void    End();
         virtual int     PushBack (TData &&data);
         virtual int     PushFront(TData &&data);
 
@@ -493,6 +539,7 @@ int WorkQueuePool<TData, TThread>::PushFront(TData &&data)
     return idx;
 }
 
+
 template <typename TData, typename TThread>
 int WorkQueuePool<TData, TThread>::Pop(TData * /*data*/)
 {
@@ -500,6 +547,24 @@ int WorkQueuePool<TData, TThread>::Pop(TData * /*data*/)
     std::cout << "Please overload the virtual member function below\n";
     std::cout << "WorkQueuePool::Pop\n";
     return 0;
+}
+
+
+template <typename TData, typename TThread>
+void WorkQueuePool<TData, TThread>::Begin()
+{
+//    std::cout << "Listen thread will be begun\n";
+//    std::cout << "Please overload the virtual member function below\n";
+//    std::cout << "WorkQueuePool::Begin\n";
+}
+
+
+template <typename TData, typename TThread>
+void WorkQueuePool<TData, TThread>::End()
+{
+//    std::cout << "Listen thread will be stop\n";
+//    std::cout << "Please overload the virtual member function below\n";
+//    std::cout << "WorkQueuePool::End\n";
 }
 
 
