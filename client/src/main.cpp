@@ -21,7 +21,7 @@ WQPApp::WQPApp()
 
 int WQPApp::Pop(uint64_t *pData)
 {
-    std::cout << "Pop : do some queued and paralized obs. " <<  (int) (*pData) << "\n";
+    std::cout << "Pop : do some queued and paralized jobs. " <<  (int) (*pData) << "\n";
     return 0;
 }
 
@@ -33,7 +33,7 @@ int main(int argc, const char * argv[])
 
     WQPApp que;
     que.Init(WQ_QUEUE_STATE::WORKING);
-    
+
     for (int i = 0; i < 10000; ++i)
     {
         que.PushBack(i);

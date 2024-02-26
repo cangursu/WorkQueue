@@ -8,7 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 enable_testing()
 
-add_subdirectory(prj)
+add_subdirectory(lib)
+add_subdirectory(client)
 add_subdirectory(test)
 
 
