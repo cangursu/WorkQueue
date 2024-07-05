@@ -130,11 +130,15 @@ class WorkQueue : public TThread
     virtual void                Run() override;
 
 
-    virtual void                Begin();
+    virtual void                Begin(__attribute__((unused)) TData *); //nullptr is passed. Parameter is just for Overloading
     virtual int                 Pop(TData *data);
-    virtual void                End();
+    virtual void                End(__attribute__((unused)) TData *);   //nullptr is passed. Parameter is just for Overloading
     virtual size_t              PushBack (TData &&data);
+    virtual size_t              PushBack (const TData &data);
     virtual size_t              PushFront(TData &&data);
+    virtual size_t              PushFront(const TData &data);
+    virtual size_t              PushFresh(TData &&data);
+    virtual size_t              PushFresh(const TData &data);
 
     virtual void*               Listener();
     void                        Release(bool bForce = false);
@@ -170,7 +174,7 @@ int WorkQueue<TData, TThread>::Pop(TData*)
 
 
 template <typename TData, typename TThread>
-void WorkQueue<TData, TThread>::Begin()
+void WorkQueue<TData, TThread>::Begin(TData *)
 {
 //    std::cout << "Listen thread will be begun\n";
 //    std::cout << "Please overload the virtual member function below\n";
@@ -179,7 +183,7 @@ void WorkQueue<TData, TThread>::Begin()
 
 
 template <typename TData, typename TThread>
-void WorkQueue<TData, TThread>::End()
+void WorkQueue<TData, TThread>::End(TData *)
 {
 //    std::cout << "Listen thread will be stop\n";
 //    std::cout << "Please overload the virtual member function below\n";
@@ -254,20 +258,48 @@ const std::string& WorkQueue<TData, TThread>::Name() const
 
 
 template <typename TData, typename TThread>
-size_t WorkQueue<TData, TThread>::PushBack(TData &&data)
+size_t WorkQueue<TData, TThread>::PushBack(const TData &data)
 {
     switch (GetState())
     {
-        case WQ_QUEUE_STATE::EXITING_WAIT  :
-        case WQ_QUEUE_STATE::EXITING_FORCE :
-        case WQ_QUEUE_STATE::PAUSE         :
-            break;
-
-        default :
+        case WQ_QUEUE_STATE::WORKING :
+        {
             std::lock_guard<std::mutex> lck{_thLockQue};
-            _container.emplace_front(std::move(data));
+            _container.emplace_front(data);
             ++_containerSize;
             _thCond.notify_one();
+            break;
+        }
+
+        default :
+            break;
+    }
+
+    return _containerSize;
+}
+
+
+template <typename TData, typename TThread>
+size_t WorkQueue<TData, TThread>::PushBack(TData &&data)
+{
+    return PushBack(data);
+}
+
+
+template <typename TData, typename TThread>
+size_t WorkQueue<TData, TThread>::PushFront(const TData &data)
+{
+    switch (GetState())
+    {
+        case WQ_QUEUE_STATE::WORKING :
+        {
+            std::lock_guard<std::mutex> lck{_thLockQue};
+            _container.emplace_back(data);
+            ++_containerSize;
+            _thCond.notify_one();
+        }
+
+        default :
             break;
     }
 
@@ -278,30 +310,46 @@ size_t WorkQueue<TData, TThread>::PushBack(TData &&data)
 template <typename TData, typename TThread>
 size_t WorkQueue<TData, TThread>::PushFront(TData &&data)
 {
+    return PushFront(data);
+}
+
+
+template <typename TData, typename TThread>
+size_t WorkQueue<TData, TThread>::PushFresh(const TData &data)
+{
     switch (GetState())
     {
-        case WQ_QUEUE_STATE::EXITING_WAIT  :
-        case WQ_QUEUE_STATE::EXITING_FORCE :
-        case WQ_QUEUE_STATE::PAUSE         :
-            break;
+        case WQ_QUEUE_STATE::WORKING :
+        {
+            std::lock_guard<std::mutex> lck{_thLockQue};
+            _container.clear();
+            _container.emplace_back(data);
+            _containerSize = 1;
+            _thCond.notify_one();
+        }
 
         default :
-            std::lock_guard<std::mutex> lck{_thLockQue};
-            _container.emplace_back(std::move(data));
-            ++_containerSize;
-            _thCond.notify_one();
+            break;
     }
 
     return _containerSize;
 }
 
+
+template <typename TData, typename TThread>
+size_t WorkQueue<TData, TThread>::PushFresh(TData &&data)
+{
+    return PushFresh(data);
+}
+
+
 template <typename TData, typename TThread>
 void WorkQueue<TData, TThread>::Run()
 {
 //    std::cout << "WorkQueue thread : " << _name << " : Entering\n";
-    Begin();
+    Begin(nullptr);
     Listener();
-    End();
+    End(nullptr);
 //    std::cout << "WorkQueue thread : " << _name << " : Quiting \n";
 }
 
@@ -310,7 +358,7 @@ template <typename TData, typename TThread>
 void* WorkQueue<TData, TThread>::Listener()
 {
     bool doExit = false;
-    for(int count = 0; true != doExit; count++)
+    for(/*int count = 0*/; true != doExit; /*count++*/)
     {
         switch(GetState())
         {
@@ -406,7 +454,7 @@ class WorkQueuePool
             {
                 _pPool = pool;
             }
-            virtual void Begin() override
+            virtual void Begin(TData *) override
             {
                 if (nullptr == _pPool)
                 {
@@ -426,7 +474,7 @@ class WorkQueuePool
 
                 return _pPool->Pop(data);
             }
-            virtual void End() override
+            virtual void End(TData *) override
             {
                 if (nullptr == _pPool)
                 {

@@ -15,12 +15,12 @@ TEST(test_workqueue, wq_basicpush)
     class WQTester : public WorkQueue<uint64_t, Thread>
     {
         public:
-            void Begin()
+            void Begin(uint64_t*)
             {
                 _tidBegin = gettid();
             }
 
-            void End()
+            void End(uint64_t*)
             {
                 _tidEnd = gettid();
             }
@@ -146,12 +146,49 @@ TEST(test_workqueue, wq_tickthred)
     EXPECT_GE(ts.tv_nsec,   7000000);
     EXPECT_LE(ts.tv_nsec,  13000000);
 
+//TODO: Add Getter/Setter for _stop, _stop
+/*
     EXPECT_TRUE (timer._stop  >  timer._start );
     EXPECT_TRUE (timer._start <  timer._stop  );
     EXPECT_TRUE (timer._stop  >= timer._start );
     EXPECT_TRUE (timer._start <= timer._stop  );
     EXPECT_TRUE (timer._start == timer._start );
+*/
 }
+
+
+
+class QueFreshTest : public WorkQueue<int, Thread>
+{
+    public :
+        int Pop(int *pData)
+        {
+            _list.emplace_back(*pData);
+            usleep(10);
+            return 0;
+        }
+
+        std::vector<int> _list;
+};
+
+
+TEST(test_workqueue, wq_pushfresh)
+{
+    QueFreshTest que;
+    que.Init(WQ_QUEUE_STATE::WORKING, "PushFreshTest");
+
+    int i = 1;
+    que.PushFresh(i);
+    usleep(5);
+    while(++i < 10)
+        que.PushFresh(i);
+    que.Release();
+
+    EXPECT_EQ(2, que._list.size());
+    EXPECT_EQ(1, que._list[0]);
+    EXPECT_EQ(9, que._list[1]);
+}
+
 
 
 
@@ -201,5 +238,6 @@ TEST(test_wqpool, wqp_basicpush)
 
     wpool.Release();
 }
+
 
 // clang-format on
