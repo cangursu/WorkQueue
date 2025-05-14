@@ -5,41 +5,6 @@
 #include <WorkQueue.h>
 
 
-void TickThread::SetInterval(size_t val)
-{
-    std::unique_lock<std::mutex> lock(_mtx);
-    _interval = std::chrono::milliseconds(val);
-}
-
-
-void TickThread::Stop()
-{
-    {
-        std::unique_lock<std::mutex> lock(_mtx);
-        _quit.store(true);
-        _cv.notify_all();
-    }
-    Join();
-}
-
-
-void TickThread::Run()
-{
-    _tickCount = 0;
-    _tickTs.Reset();
-
-    std::unique_lock<std::mutex> lock(_mtx);
-    while (!_cv.wait_for(lock, _interval, [this]{return _quit.load();}))
-    {
-        _tickTs.Step();
-        ++_tickCount;
-
-        Tick();
-    }
-}
-
-
-
 
 std::string WQ_QUEUE_STATE_text(WQ_QUEUE_STATE value)
 {

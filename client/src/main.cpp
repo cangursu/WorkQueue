@@ -7,15 +7,17 @@
 
 
 
-class WQPApp : public WorkQueuePool<uint64_t, Thread>
+class WQPApp : public WorkQueuePool<uint64_t, WQPApp>
 {
     public:
         WQPApp();
-        int Pop(uint64_t *pData);
+        int  Pop(uint64_t *pData);
+        void Begin()   { /*std::cout << "Begin" << std::endl;*/ }
+        void End()     { /*std::cout << "End" << std::endl;  */ }
 };
 
 WQPApp::WQPApp()
-    : WorkQueuePool<uint64_t, Thread>(5)
+    : WorkQueuePool<uint64_t, WQPApp>(5)
 {
 }
 

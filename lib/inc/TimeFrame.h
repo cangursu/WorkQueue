@@ -10,47 +10,48 @@
 #include <string>
 #include <array>
 #include <time.h>
-
+#include <stdint.h>
 
 
 
 // Time Units Conversion Macros
 
-#define US_TO_NS(v)     ((v)*1000L)             // Microsecond to Nanosecond
-#define MS_TO_NS(v)     ((v)*1000000L)          // Milisecond to Nanosecond
-#define SEC_TO_NS(v)    ((v)*1000000000L)       // Second to Nanosecond
-#define MIN_TO_NS(v)    ((v)*60000000000L)      // Minute to Nanosecond
-#define HR_TO_NS(v)     ((v)*3600000000000L)    // Hour to Nanosecond
+#define US_TO_NS(v)     ((v)*1'000L)                // Microsecond to Nanosecond
+#define MS_TO_NS(v)     ((v)*1'000'000L)            // Milisecond to Nanosecond
+#define SEC_TO_NS(v)    ((v)*1'000'000'000L)        // Second to Nanosecond
+#define MIN_TO_NS(v)    ((v)*60'000'000'000L)       // Minute to Nanosecond
+#define HR_TO_NS(v)     ((v)*3'600'000'000'000L)    // Hour to Nanosecond
 
-#define NS_TO_US(v)     ((v)/1000.0)            // Nanosecond to Microsecond
-#define MS_TO_US(v)     ((v)*1000L)             // Milisecond to Microsecond
-#define SEC_TO_US(v)    ((v)*1000000L)          // Second to Microsecond
-#define MIN_TO_US(v)    ((v)*60000000L)         // Minute to Microsecond
-#define HR_TO_US(v)     ((v)*3600000000L)       // Hour to Microsecond
+#define NS_TO_US(v)     ((v)/1'000.0)               // Nanosecond to Microsecond
+#define MS_TO_US(v)     ((v)*1'000L)                // Milisecond to Microsecond
+#define SEC_TO_US(v)    ((v)*1'000'000L)            // Second to Microsecond
+#define MIN_TO_US(v)    ((v)*60'000'000L)           // Minute to Microsecond
+#define HR_TO_US(v)     ((v)*3'600'000'000L)        // Hour to Microsecond
 
-#define NS_TO_MS(v)     ((v)/1000000.0)         // Nanosecond to Milisecond
-#define US_TO_MS(v)     ((v)/1000.0)            // Microsecond to Milisecond
-#define SEC_TO_MS(v)    ((v)*1000L)             // Second to Milisecond
-#define MIN_TO_MS(v)    ((v)*60000L)            // Minute to Milisecond
-#define HR_TO_MS(v)     ((v)*3600000L)          // Hour to Milisecond
+#define NS_TO_MS(v)     ((v)/1'000'000.0)           // Nanosecond to Milisecond
+#define US_TO_MS(v)     ((v)/1'000.0)               // Microsecond to Milisecond
+#define SEC_TO_MS(v)    ((v)*1'000L)                // Second to Milisecond
+#define MIN_TO_MS(v)    ((v)*60'000L)               // Minute to Milisecond
+#define HR_TO_MS(v)     ((v)*3'600'000L)            // Hour to Milisecond
 
-#define NS_TO_SEC(v)    ((v)/1000000000.0)      // Nanosecond to Second
-#define US_TO_SEC(v)    ((v)/1000000.0)         // Microsecond to Second
-#define MS_TO_SEC(v)    ((v)/1000.0)            // Milisecond to Second
-#define MIN_TO_SEC(v)   ((v)/60.0)              // Minute to Second
-#define HR_TO_SEC(v)    ((v)/3600.0)            // Hour to Second
+#define NS_TO_SEC(v)    ((v)/1'000'000'000.0)       // Nanosecond to Second
+#define US_TO_SEC(v)    ((v)/1'000'000.0)           // Microsecond to Second
+#define MS_TO_SEC(v)    ((v)/1'000.0)               // Milisecond to Second
+#define MIN_TO_SEC(v)   ((v)/60.0)                  // Minute to Second
+#define HR_TO_SEC(v)    ((v)/3'600.0)               // Hour to Second
 
-#define NS_TO_MIN(v)    ((v)/60000000000.0)     // Nanosecondto Minute
-#define US_TO_MIN(v)    ((v)/60000000.0)        // Microsecondto Minute
-#define MS_TO_MIN(v)    ((v)/60000.0)           // Milisecondto Minute
-#define SEC_TO_MIN(v)   ((v)/60.0)              // Second to Minute
-#define HR_TO_MIN(v)    ((v)*60L)               // Hour to Minute
+#define NS_TO_MIN(v)    ((v)/60'000'000'000.0)      // Nanosecondto Minute
+#define US_TO_MIN(v)    ((v)/60'000'000.0)          // Microsecondto Minute
+#define MS_TO_MIN(v)    ((v)/60'000.0)              // Milisecondto Minute
+#define SEC_TO_MIN(v)   ((v)/60.0)                  // Second to Minute
+#define HR_TO_MIN(v)    ((v)*60L)                   // Hour to Minute
 
-#define NS_TO_HR(v)     ((v)/3600000000000.0    // Nanosecondto to Hour
-#define US_TO_HR(v)     ((v)/3600000000.0)      // Microsecondto to Hour
-#define MS_TO_HR(v)     ((v)/3600000.0)         // Milisecondto to Hour
-#define SEC_TO_HR(v)    ((v)/3600.0)            // Second to Hour
-#define MIN_TO_HR(v)    ((v)/60.0)              // Minute to Hour
+#define NS_TO_HR(v)     ((v)/3'600'000'000'000.0)   // Nanosecondto to Hour
+#define US_TO_HR(v)     ((v)/3'600'000'000.0)       // Microsecondto to Hour
+#define MS_TO_HR(v)     ((v)/3'600'000.0)           // Milisecondto to Hour
+#define SEC_TO_HR(v)    ((v)/3'600.0)               // Second to Hour
+#define MIN_TO_HR(v)    ((v)/60.0)                  // Minute to Hour
+
 
 
 
@@ -58,11 +59,22 @@
 // #define TIMEFRAME_RC(tm, rc, fn, args...) { (tm).Start(); (rc) = (fn)(args); (tm).Stop(); }
 
 
+const timespec& TimespecConvertOffset();
+timespec        TimespecConvertBT_RT(const timespec &ts);
+timespec        TimespecConvertRT_BT(const timespec &ts);
+
+
 //TODO: Convert these to macros
 std::string TimespecText(const timespec &ts);
 void        TimespecText(const timespec &ts, std::ostringstream &os);
+
+std::string TimespecText2(const timespec &ts, bool date = true);
+void        TimespecText2(const timespec &ts, std::ostringstream &os, bool date = true);
+
+
 int64_t     TimespecToNs(const timespec &ts);
 timespec    TimespecFromNs(double ns);
+timespec    TimespecFromNs(uint64_t ns);  //Required due to double precision failure
 
 
 class TimeFrame

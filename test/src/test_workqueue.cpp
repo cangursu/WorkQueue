@@ -12,15 +12,15 @@
 
 TEST(test_workqueue, wq_basicpush)
 {
-    class WQTester : public WorkQueue<uint64_t, Thread>
+    class WQTester : public WorkQueue<uint64_t, WQTester>
     {
         public:
-            void Begin(uint64_t*)
+            void Begin()
             {
                 _tidBegin = gettid();
             }
 
-            void End(uint64_t*)
+            void End()
             {
                 _tidEnd = gettid();
             }
@@ -69,7 +69,7 @@ TEST(test_workqueue, wq_basicpush)
 }
 
 
-class WQTesterSlow : public WorkQueue<uint8_t, Thread>
+class WQTesterSlow : public WorkQueue<uint8_t, WQTesterSlow>
 {
     public:
         int Pop(uint8_t *pData)
@@ -77,6 +77,15 @@ class WQTesterSlow : public WorkQueue<uint8_t, Thread>
             ++_count;
             usleep(1000);
             return 0;
+        }
+
+        void Begin()
+        {
+            _count = 0;
+        }
+
+        void End()
+        {
         }
         int     _count    = 0;
 };
@@ -119,10 +128,19 @@ TEST(test_workqueue, wq_statetext)
 
 
 
-class TickThreadTest : public TickThread
+class TickThreadTest : public TickThread<TickThreadTest>
 {
     public:
-        virtual void Tick()
+        void Tick()
+        {
+        }
+
+        bool OnBegin()
+        {
+            return true;
+        }
+
+        void OnEnd()
         {
         }
 };
@@ -133,7 +151,7 @@ TEST(test_workqueue, wq_tickthred)
 
     tester.SetInterval(10);
     tester.Start();
-    usleep(100000);
+    usleep(10000);
     tester.Stop();
     TimeFrame  timer = tester.TickTimeFrame();
 
@@ -143,8 +161,8 @@ TEST(test_workqueue, wq_tickthred)
     timespec ts = timer.Elaps();
 
     EXPECT_EQ(ts.tv_sec,         0);
-    EXPECT_GE(ts.tv_nsec,   7000000);
-    EXPECT_LE(ts.tv_nsec,  13000000);
+    EXPECT_GE(ts.tv_nsec,   700000);
+    EXPECT_LE(ts.tv_nsec,  1300000);
 
 //TODO: Add Getter/Setter for _stop, _stop
 /*
@@ -158,7 +176,7 @@ TEST(test_workqueue, wq_tickthred)
 
 
 
-class QueFreshTest : public WorkQueue<int, Thread>
+class QueFreshTest : public WorkQueue<int, QueFreshTest>
 {
     public :
         int Pop(int *pData)
@@ -166,6 +184,14 @@ class QueFreshTest : public WorkQueue<int, Thread>
             _list.emplace_back(*pData);
             usleep(10);
             return 0;
+        }
+
+        void Begin()
+        {
+            _list.clear();
+        }
+        void End()
+        {
         }
 
         std::vector<int> _list;
@@ -196,25 +222,27 @@ TEST(test_wqpool, wqp_basicpush)
 {
     static std::atomic_uint64_t global_data = 0;
 
-    class WQPTester : public WorkQueuePool<uint64_t, Thread>
+    class WQPTester : public WorkQueuePool<uint64_t, WQPTester>
     {
         public:
             WQPTester(size_t queCount)
-                : WorkQueuePool<uint64_t, Thread>(queCount)
+                : WorkQueuePool<uint64_t, WQPTester>(queCount)
             {
             }
 
             void Begin()
             {
+//                std::cout << "Begin\n";
             }
 
             void End()
             {
+//                std::cout << "End\n";
             }
 
             int Pop(uint64_t *pData)
             {
-                //std::cout << "Pop : " << std::hex <<  (int) (*pData) << "\n";
+//                std::cout << "Pop : " << std::hex <<  (int) (*pData) << "\n";
                 EXPECT_TRUE(pData);
                 if (pData) global_data |= *pData;
                 return 0;

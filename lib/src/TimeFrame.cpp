@@ -8,12 +8,43 @@
 #include <ctime>
 
 
+
+const timespec& TimespecConvertOffset()
+{
+    static timespec s_tsOffset {};
+    if ((0 == s_tsOffset.tv_sec) && (0 == s_tsOffset.tv_nsec))
+    {
+        timespec tsSrc {};
+        timespec tsDst {};
+        clock_gettime(CLOCK_REALTIME,  &tsSrc);
+        clock_gettime(CLOCK_BOOTTIME, &tsDst);
+
+        s_tsOffset = tsSrc - tsDst;
+    }
+    return s_tsOffset;
+}
+
+timespec TimespecConvertBT_RT(const timespec &ts)
+{
+    const timespec &tsOfs = TimespecConvertOffset();
+    return tsOfs + ts;
+}
+
+
+timespec TimespecConvertRT_BT(const timespec &ts)
+{
+    const timespec &tsOfs = TimespecConvertOffset();
+    return ts - tsOfs;
+}
+
+
 std::string TimespecText(const timespec &ts)
 {
     std::ostringstream os;
     TimespecText(ts, os);
     return os.str();
 }
+
 
 void TimespecText(const timespec &ts, std::ostringstream &os)
 {
@@ -25,20 +56,69 @@ void TimespecText(const timespec &ts, std::ostringstream &os)
 }
 
 
+std::string TimespecText2(const timespec &ts, bool date /*= true*/)
+{
+    std::ostringstream os;
+    TimespecText2(ts, os, date);
+    return os.str();
+}
+
+
+void TimespecText2(const timespec &ts, std::ostringstream &os, bool date /*= true*/)
+{
+    tm tmNow {};
+
+    gmtime_r(&ts.tv_sec, &tmNow);
+    std::ostringstream ss;
+    if(date)
+    {
+        os  << std::setfill('0') << std::setw(4) << (tmNow.tm_year + 1900) << "."
+            << std::setfill('0') << std::setw(2) << tmNow.tm_mon + 1 << "."
+            << std::setfill('0') << std::setw(2) << tmNow.tm_mday;
+        os  << " - ";
+    }
+
+    uint64_t ns = ts.tv_nsec;
+    uint64_t ms = NS_TO_MS(ns);
+    ns -= MS_TO_NS(ms);
+    uint64_t us = NS_TO_US(ns);
+    ns -= US_TO_NS(us);
+
+    os  << std::setfill('0') << std::setw(2) << tmNow.tm_hour << ":"
+        << std::setfill('0') << std::setw(2) << tmNow.tm_min << ":"
+        << std::setfill('0') << std::setw(2) << tmNow.tm_sec << "."
+//        << "-" << ts.tv_nsec << "-"
+        << std::setfill('0') << std::setw(3) << ms << "."
+        << std::setfill('0') << std::setw(3) << us << "."
+        << std::setfill('0') << std::setw(3) << ns;
+}
+
+
 int64_t TimespecToNs(const timespec &ts)
 {
-    int64_t ns = ts.tv_sec;
-    return SEC_TO_NS (ns) + ts.tv_nsec;
+    return SEC_TO_NS(ts.tv_sec) + ts.tv_nsec;
 }
+
 
 timespec TimespecFromNs(double ns)
 {
     timespec ts;
     ts.tv_sec  = NS_TO_SEC(ns);
-    ts.tv_nsec = int(ns) - SEC_TO_NS(ts.tv_sec);
+    ts.tv_nsec = uint64_t(ns) - SEC_TO_NS(ts.tv_sec);
 
     return ts;
 }
+
+
+timespec TimespecFromNs(uint64_t ns)
+{
+    timespec ts;
+    ts.tv_sec  = NS_TO_SEC(ns);
+    ts.tv_nsec = ns - SEC_TO_NS(ts.tv_sec);
+
+    return ts;
+}
+
 
 timespec TimeFrame::Elaps() const
 {
@@ -107,7 +187,7 @@ timespec TimeFrame::TimeSpecDif(const timespec &t1, const timespec &t2)
 
 timespec TimeFrame::TimeSpecDiv (const timespec &ts, double val)
 {
-    int64_t ns = TimespecToNs(ts);
+    uint64_t ns = TimespecToNs(ts);
     ns /= val;
     return TimespecFromNs(ns);
 }
